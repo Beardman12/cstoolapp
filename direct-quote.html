@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>直发报价图生成</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
+
+    <header class="topbar container">
+      <div class="brand">Price App</div>
+      <nav class="topnav">
+        <a class="topnav-link" href="./index.html">首页</a>
+        <a class="topnav-link active" href="./direct-quote.html">直发报价图生成</a>
+      </nav>
+    </header>
+
+    <main class="container page-wrap">
+      <section class="card form-card">
+        <h1>直发报价图生成</h1>
+        <p class="subtext">参数均为必填，提交后自动展示接口文本结果与图片结果。</p>
+        <p id="loading-text" class="loading-text" role="status" aria-live="polite"></p>
+
+        <form id="query-form" novalidate>
+          <div class="form-grid">
+            <div class="field">
+              <label for="code-search">产品代码</label>
+              <div class="combo" id="code-combo">
+                <button
+                  class="combo-trigger"
+                  type="button"
+                  id="combo-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  请选择产品代码
+                </button>
+                <div class="combo-panel" id="combo-panel" hidden>
+                  <input
+                    id="code-search"
+                    class="combo-search"
+                    type="text"
+                    placeholder="输入关键字筛选，例如 SUI"
+                    autocomplete="off"
+                  />
+                  <ul id="code-list" class="combo-list" role="listbox" aria-label="产品代码列表"></ul>
+                </div>
+              </div>
+              <input type="hidden" id="selected-code" name="code" />
+              <p class="field-tip">下拉列表支持关键字筛选，value 与文本均为 code。</p>
+            </div>
+            <br/>
+
+            <div class="field">
+              <label for="grade">报价等级</label>
+              <select id="grade" name="grade" required>
+                <option value="">请选择等级</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-primary" type="submit" id="submit-btn">确定获取</button>
+            <p id="form-error" class="error-text" role="alert" aria-live="assertive"></p>
+          </div>
+        </form>
+      </section>
+
+      <section class="card result-card">
+        <h2>接口结果</h2>
+
+        <div class="result-row">
+          <h3>图片结果</h3>
+          <div id="image-groups" class="image-groups">
+            <p class="empty-tip">暂无图片</p>
+          </div>
+        </div>
+
+         <div class="result-row">
+          <h3>成功信息</h3>
+          <pre id="stdout-box" class="result-box">暂无结果</pre>
+        </div>
+
+        <div class="result-row">
+          <h3>错误信息</h3>
+          <pre id="stderr-box" class="result-box">暂无结果</pre>
+        </div>
+      </section>
+    </main>
+
+    <script src="./assets/app.js?v=2"></script>
+  </body>
+</html>
