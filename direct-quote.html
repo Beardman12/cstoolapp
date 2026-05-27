@@ -103,6 +103,23 @@
       </section>
     </main>
 
-    <script src="./assets/app.js?v=2"></script>
+    <div id="image-preview-modal" class="image-preview-modal" hidden aria-hidden="true">
+      <div class="image-preview-backdrop" data-close-preview="true"></div>
+      <div class="image-preview-dialog" role="dialog" aria-modal="true" aria-label="图片预览">
+        <button id="preview-close-btn" class="preview-close-btn" type="button" aria-label="关闭预览">关闭</button>
+        <div class="preview-toolbar">
+          <button id="preview-prev-btn" class="preview-nav-btn" type="button" aria-label="上一张">上一张</button>
+          <p id="preview-counter" class="preview-counter">0 / 0</p>
+          <button id="preview-next-btn" class="preview-nav-btn" type="button" aria-label="下一张">下一张</button>
+        </div>
+        <p id="preview-title" class="preview-title">-</p>
+        <div id="preview-stage" class="preview-stage">
+          <img id="preview-image" class="preview-image" alt="预览图" />
+        </div>
+        <p class="preview-tip">支持左右滑动切图；下滑关闭，首张右滑可返回关闭</p>
+      </div>
+    </div>
+
+    <script src="./assets/app.js?v=5"></script>
   </body>
 </html>

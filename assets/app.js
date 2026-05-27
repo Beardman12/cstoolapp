@@ -22,6 +22,24 @@ const refs = {
   stdoutBox: document.getElementById("stdout-box"),
   stderrBox: document.getElementById("stderr-box"),
   imageGroups: document.getElementById("image-groups"),
+  previewModal: document.getElementById("image-preview-modal"),
+  previewImage: document.getElementById("preview-image"),
+  previewCloseBtn: document.getElementById("preview-close-btn"),
+  previewPrevBtn: document.getElementById("preview-prev-btn"),
+  previewNextBtn: document.getElementById("preview-next-btn"),
+  previewCounter: document.getElementById("preview-counter"),
+  previewTitle: document.getElementById("preview-title"),
+  previewStage: document.getElementById("preview-stage"),
+};
+
+const previewGesture = {
+  startX: 0,
+  startY: 0,
+};
+
+const previewState = {
+  items: [],
+  index: -1,
 };
 
 function setLoadingText(message) {
@@ -182,12 +200,15 @@ function createImageBlock(title, urls) {
     img.src = url;
     img.alt = `${title}${index + 1}`;
     img.loading = "lazy";
+    img.dataset.previewUrl = url;
+    img.classList.add("can-preview");
+    img.setAttribute("role", "button");
+    img.setAttribute("tabindex", "0");
 
     const link = document.createElement("a");
     link.className = "image-link";
-    link.href = url;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
+    link.href = "#";
+    link.dataset.previewUrl = url;
     link.textContent = "查看原图";
 
     const download = document.createElement("a");
@@ -206,6 +227,207 @@ function createImageBlock(title, urls) {
   block.appendChild(grid);
 
   return block;
+}
+
+function collectPreviewItems() {
+  const images = refs.imageGroups.querySelectorAll("img[data-preview-url]");
+
+  previewState.items = Array.from(images)
+    .map((img) => {
+      const url = img.dataset.previewUrl || "";
+      const groupTitle = img.closest(".image-group")?.querySelector("h4")?.textContent?.trim() || "未分类图片";
+
+      return {
+        url,
+        title: groupTitle,
+        alt: img.alt || "预览图",
+      };
+    })
+    .filter((item) => Boolean(item.url));
+}
+
+function updatePreviewMeta() {
+  const total = previewState.items.length;
+  const current = previewState.index + 1;
+
+  if (refs.previewCounter) {
+    refs.previewCounter.textContent = total > 0 ? `${current} / ${total}` : "0 / 0";
+  }
+
+  if (refs.previewPrevBtn) {
+    refs.previewPrevBtn.disabled = previewState.index <= 0;
+  }
+
+  if (refs.previewNextBtn) {
+    refs.previewNextBtn.disabled = previewState.index >= total - 1;
+  }
+
+  if (refs.previewTitle) {
+    refs.previewTitle.textContent =
+      previewState.index >= 0 && previewState.items[previewState.index]
+        ? previewState.items[previewState.index].title
+        : "-";
+  }
+}
+
+function showPreviewAt(index, altText) {
+  const total = previewState.items.length;
+
+  if (!total || index < 0 || index >= total || !refs.previewImage) {
+    return;
+  }
+
+  previewState.index = index;
+  refs.previewImage.src = previewState.items[index].url;
+  refs.previewImage.alt = altText || previewState.items[index].alt || `预览图 ${index + 1}`;
+  updatePreviewMeta();
+}
+
+function showPrevPreview() {
+  if (previewState.index <= 0) {
+    return;
+  }
+
+  showPreviewAt(previewState.index - 1);
+}
+
+function showNextPreview() {
+  if (previewState.index >= previewState.items.length - 1) {
+    return;
+  }
+
+  showPreviewAt(previewState.index + 1);
+}
+
+function openPreview(url, altText) {
+  if (!refs.previewModal || !refs.previewImage) {
+    return;
+  }
+
+  collectPreviewItems();
+  const matchedIndex = previewState.items.findIndex((item) => item.url === url);
+  const startIndex = Math.max(0, matchedIndex);
+
+  showPreviewAt(startIndex, altText || "预览图");
+  refs.previewModal.hidden = false;
+  refs.previewModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  refs.previewCloseBtn?.focus();
+}
+
+function closePreview() {
+  if (!refs.previewModal || !refs.previewImage) {
+    return;
+  }
+
+  refs.previewModal.hidden = true;
+  refs.previewModal.setAttribute("aria-hidden", "true");
+  refs.previewImage.src = "";
+  previewState.items = [];
+  previewState.index = -1;
+  updatePreviewMeta();
+  document.body.classList.remove("modal-open");
+}
+
+function bindPreviewEvents() {
+  if (!refs.previewModal || !refs.previewImage) {
+    return;
+  }
+
+  refs.imageGroups.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-preview-url]");
+
+    if (!trigger) {
+      return;
+    }
+
+    event.preventDefault();
+    openPreview(trigger.dataset.previewUrl, "预览图");
+  });
+
+  refs.imageGroups.addEventListener("keydown", (event) => {
+    const trigger = event.target.closest("[data-preview-url]");
+
+    if (!trigger) {
+      return;
+    }
+
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    openPreview(trigger.dataset.previewUrl, "预览图");
+  });
+
+  refs.previewCloseBtn?.addEventListener("click", closePreview);
+  refs.previewPrevBtn?.addEventListener("click", showPrevPreview);
+  refs.previewNextBtn?.addEventListener("click", showNextPreview);
+
+  refs.previewModal.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest("[data-close-preview='true']")) {
+      closePreview();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!refs.previewModal || refs.previewModal.hidden) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      closePreview();
+      return;
+    }
+
+    if (event.key === "ArrowLeft") {
+      showPrevPreview();
+      return;
+    }
+
+    if (event.key === "ArrowRight") {
+      showNextPreview();
+    }
+  });
+
+  refs.previewStage?.addEventListener(
+    "touchstart",
+    (event) => {
+      const touch = event.touches[0];
+      previewGesture.startX = touch.clientX;
+      previewGesture.startY = touch.clientY;
+    },
+    { passive: true },
+  );
+
+  refs.previewStage?.addEventListener(
+    "touchend",
+    (event) => {
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - previewGesture.startX;
+      const deltaY = touch.clientY - previewGesture.startY;
+
+      if (deltaY > 80 && Math.abs(deltaX) < 60) {
+        closePreview();
+        return;
+      }
+
+      if (Math.abs(deltaX) > 90 && Math.abs(deltaY) < 70) {
+        if (deltaX > 0) {
+          if (previewState.index === 0) {
+            closePreview();
+            return;
+          }
+
+          showPrevPreview();
+          return;
+        }
+
+        showNextPreview();
+      }
+    },
+    { passive: true },
+  );
 }
 
 function createEmptyImageBlock(title, message) {
@@ -332,6 +554,7 @@ function bindEvents() {
   });
 
   refs.form.addEventListener("submit", submitQuery);
+  bindPreviewEvents();
 }
 
 function init() {
