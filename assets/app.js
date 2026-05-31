@@ -1,7 +1,7 @@
 const API_BASE = "https://cstool.ck1info.com/api/price/";
 const OPTIONS_URL = `${API_BASE}/api/promo/options`;
 const QUERY_URL = `${API_BASE}/api/query/run`;
-const PRICING_API_BASE = "http://127.0.0.1:18000/api/v1/pricing";
+const PRICING_API_BASE = "https://cstool.ck1info.com/api/v1/pricing";
 const COUNTRIES_URL = `${PRICING_API_BASE}/countries`;
 const COUNTRY_IMAGES_URL = `${PRICING_API_BASE}/images`;
 
