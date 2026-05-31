@@ -136,6 +136,8 @@ function setResultLoadingState(loading) {
 function openPanel() {
   refs.panel.hidden = false;
   refs.trigger.setAttribute("aria-expanded", "true");
+  refs.search.value = "";
+  filterCodes("");
   refs.search.focus();
 }
 
