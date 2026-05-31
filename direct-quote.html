@@ -27,7 +27,7 @@
     <main class="container page-wrap">
       <section class="card form-card">
         <h1>直发报价图生成</h1>
-        <p class="subtext">参数均为必填，提交后自动展示接口文本结果与图片结果。</p>
+        <p class="subtext">产品代码和报价等级为必填；国家为可选，提交后自动展示接口文本结果与图片结果。</p>
         <p id="loading-text" class="loading-text" role="status" aria-live="polite"></p>
 
         <form id="query-form" novalidate>
@@ -72,6 +72,16 @@
                 <option value="F">F</option>
               </select>
             </div>
+
+            <div class="field">
+              <label for="country" class="label-with-status">
+                国家（可选）
+                <span id="country-loading" class="inline-loading" role="status" aria-live="polite"></span>
+              </label>
+              <select id="country" name="country">
+                <option value="">不选择国家（可选）</option>
+              </select>
+            </div>
           </div>
 
           <div class="actions">
@@ -88,6 +98,13 @@
           <h3>图片结果</h3>
           <div id="image-groups" class="image-groups">
             <p class="empty-tip">暂无图片</p>
+          </div>
+        </div>
+
+        <div class="result-row">
+          <h3>产品代码-等级-国家筛选图</h3>
+          <div id="country-image-slot" class="country-image-slot">
+            <p class="empty-tip">未选择国家，暂无筛选图</p>
           </div>
         </div>
 
@@ -120,6 +137,6 @@
       </div>
     </div>
 
-    <script src="./assets/app.js?v=5"></script>
+    <script src="./assets/app.js?v=6"></script>
   </body>
 </html>

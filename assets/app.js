@@ -1,11 +1,16 @@
 const API_BASE = "https://cstool.ck1info.com/api/price/";
 const OPTIONS_URL = `${API_BASE}/api/promo/options`;
 const QUERY_URL = `${API_BASE}/api/query/run`;
+const PRICING_API_BASE = "http://127.0.0.1:18000/api/v1/pricing";
+const COUNTRIES_URL = `${PRICING_API_BASE}/countries`;
+const COUNTRY_IMAGES_URL = `${PRICING_API_BASE}/images`;
 
 const state = {
   allCodes: [],
   filteredCodes: [],
   selectedCode: "",
+  countryRequestId: 0,
+  countryImageRequestId: 0,
 };
 
 const refs = {
@@ -16,12 +21,15 @@ const refs = {
   list: document.getElementById("code-list"),
   hiddenCode: document.getElementById("selected-code"),
   grade: document.getElementById("grade"),
+  country: document.getElementById("country"),
+  countryLoading: document.getElementById("country-loading"),
   submitBtn: document.getElementById("submit-btn"),
   loadingText: document.getElementById("loading-text"),
   error: document.getElementById("form-error"),
   stdoutBox: document.getElementById("stdout-box"),
   stderrBox: document.getElementById("stderr-box"),
   imageGroups: document.getElementById("image-groups"),
+  countryImageSlot: document.getElementById("country-image-slot"),
   previewModal: document.getElementById("image-preview-modal"),
   previewImage: document.getElementById("preview-image"),
   previewCloseBtn: document.getElementById("preview-close-btn"),
@@ -44,6 +52,75 @@ const previewState = {
 
 function setLoadingText(message) {
   refs.loadingText.textContent = message || "";
+}
+
+function setCountryLoadingText(message, isError = false) {
+  refs.countryLoading.textContent = message || "";
+  refs.countryLoading.classList.toggle("is-error", isError);
+}
+
+function resetCountryOptions(disabled = true, placeholder = "不选择国家（可选）") {
+  refs.country.innerHTML = "";
+
+  const option = document.createElement("option");
+  option.value = "";
+  option.textContent = placeholder;
+  refs.country.appendChild(option);
+  refs.country.value = "";
+  refs.country.disabled = disabled;
+}
+
+function renderCountryImageIdle(message = "未选择国家，暂无筛选图") {
+  refs.countryImageSlot.classList.remove("loading-state");
+  refs.countryImageSlot.innerHTML = `<p class=\"empty-tip\">${message}</p>`;
+}
+
+function renderCountryImageLoading() {
+  refs.countryImageSlot.classList.add("loading-state");
+  refs.countryImageSlot.innerHTML = '<p class="loading-indicator">筛选图加载中...</p>';
+}
+
+function renderCountryImageError(message) {
+  refs.countryImageSlot.classList.remove("loading-state");
+  refs.countryImageSlot.innerHTML = `<p class=\"error-text\">${message || "筛选图加载失败"}</p>`;
+}
+
+function renderCountryImage(url, code, grade, country) {
+  refs.countryImageSlot.classList.remove("loading-state");
+  refs.countryImageSlot.innerHTML = "";
+
+  const wrap = document.createElement("section");
+  wrap.className = "country-image-card";
+
+  const title = document.createElement("h4");
+  title.textContent = `${code}-${grade}-${country}`;
+
+  const img = document.createElement("img");
+  img.src = url;
+  img.alt = `${code}-${grade}-${country}筛选图`;
+  img.loading = "lazy";
+  img.classList.add("can-preview");
+  img.dataset.previewUrl = url;
+  img.setAttribute("role", "button");
+  img.setAttribute("tabindex", "0");
+
+  const link = document.createElement("a");
+  link.className = "image-link";
+  link.href = "#";
+  link.dataset.previewUrl = url;
+  link.textContent = "查看原图";
+
+  const download = document.createElement("a");
+  download.className = "image-download-btn";
+  download.href = url;
+  download.download = "";
+  download.textContent = "下载图片";
+
+  wrap.appendChild(title);
+  wrap.appendChild(img);
+  wrap.appendChild(link);
+  wrap.appendChild(download);
+  refs.countryImageSlot.appendChild(wrap);
 }
 
 function setResultLoadingState(loading) {
@@ -99,8 +176,10 @@ function renderCodeList() {
       refs.hiddenCode.value = code;
       refs.trigger.textContent = code;
       setError("");
+      renderCountryImageIdle("已选择产品代码，可按需选择国家后提交");
       closePanel();
       renderCodeList();
+      loadCountriesForCode(code);
     });
 
     refs.list.appendChild(li);
@@ -139,6 +218,120 @@ async function loadOptions() {
   } catch (error) {
     refs.trigger.textContent = "产品代码加载失败";
     setError(error instanceof Error ? error.message : "产品代码加载失败");
+  }
+}
+
+async function loadCountriesForCode(code) {
+  const normalizedCode = (code || "").trim().toUpperCase();
+  state.countryImageRequestId += 1;
+
+  if (!normalizedCode) {
+    resetCountryOptions(true);
+    setCountryLoadingText("");
+    return;
+  }
+
+  state.countryRequestId += 1;
+  const currentRequestId = state.countryRequestId;
+
+  resetCountryOptions(true, "国家加载中...");
+  setCountryLoadingText("加载中...");
+
+  try {
+    const response = await fetch(`${COUNTRIES_URL}?code=${encodeURIComponent(normalizedCode)}`, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const payload = await response.json();
+
+    if (currentRequestId !== state.countryRequestId) {
+      return;
+    }
+
+    if (!response.ok || Number(payload?.code) !== 0) {
+      throw new Error(payload?.message || `国家列表请求失败，状态码：${response.status}`);
+    }
+
+    const countries = Array.isArray(payload?.data?.countries)
+      ? payload.data.countries.filter((item) => typeof item === "string" && item.trim())
+      : [];
+
+    resetCountryOptions(false, "不选择国家（可选）");
+    countries.forEach((country) => {
+      const option = document.createElement("option");
+      option.value = country;
+      option.textContent = country;
+      refs.country.appendChild(option);
+    });
+
+    setCountryLoadingText("");
+  } catch (_error) {
+    if (currentRequestId !== state.countryRequestId) {
+      return;
+    }
+
+    resetCountryOptions(true, "国家加载失败");
+    setCountryLoadingText("加载失败", true);
+  }
+}
+
+async function loadCountryFilterImage(code, grade, country) {
+  const normalizedCode = (code || "").trim().toUpperCase();
+  const normalizedGrade = (grade || "").trim().toUpperCase();
+  const normalizedCountry = (country || "").trim();
+
+  if (!normalizedCode || !normalizedGrade || !normalizedCountry) {
+    renderCountryImageIdle();
+    return;
+  }
+
+  state.countryImageRequestId += 1;
+  const currentRequestId = state.countryImageRequestId;
+
+  renderCountryImageLoading();
+
+  try {
+    const query = new URLSearchParams({
+      code: normalizedCode,
+      grade: normalizedGrade,
+      country: normalizedCountry,
+    });
+
+    const response = await fetch(`${COUNTRY_IMAGES_URL}?${query.toString()}`, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const payload = await response.json();
+
+    if (currentRequestId !== state.countryImageRequestId) {
+      return;
+    }
+
+    if (!response.ok || Number(payload?.code) !== 0) {
+      throw new Error(payload?.message || `筛选图请求失败，状态码：${response.status}`);
+    }
+
+    const images = Array.isArray(payload?.data?.images) ? payload.data.images : [];
+    const picked = images.find((item) => {
+      const sheet = typeof item?.sheet === "string" ? item.sheet : "";
+      return sheet.includes("筛选结果") && typeof item?.url === "string" && item.url.trim();
+    });
+
+    if (!picked || !picked.url) {
+      throw new Error("未找到筛选结果图片");
+    }
+
+    renderCountryImage(picked.url, normalizedCode, normalizedGrade, normalizedCountry);
+  } catch (_error) {
+    if (currentRequestId !== state.countryImageRequestId) {
+      return;
+    }
+
+    renderCountryImageError("筛选图加载失败");
   }
 }
 
@@ -230,7 +423,7 @@ function createImageBlock(title, urls) {
 }
 
 function collectPreviewItems() {
-  const images = refs.imageGroups.querySelectorAll("img[data-preview-url]");
+  const images = document.querySelectorAll("#image-groups img[data-preview-url], #country-image-slot img[data-preview-url]");
 
   previewState.items = Array.from(images)
     .map((img) => {
@@ -334,31 +527,40 @@ function bindPreviewEvents() {
     return;
   }
 
-  refs.imageGroups.addEventListener("click", (event) => {
-    const trigger = event.target.closest("[data-preview-url]");
-
-    if (!trigger) {
+  const bindPreviewTrigger = (container) => {
+    if (!container) {
       return;
     }
 
-    event.preventDefault();
-    openPreview(trigger.dataset.previewUrl, "预览图");
-  });
+    container.addEventListener("click", (event) => {
+      const trigger = event.target.closest("[data-preview-url]");
 
-  refs.imageGroups.addEventListener("keydown", (event) => {
-    const trigger = event.target.closest("[data-preview-url]");
+      if (!trigger) {
+        return;
+      }
 
-    if (!trigger) {
-      return;
-    }
+      event.preventDefault();
+      openPreview(trigger.dataset.previewUrl, "预览图");
+    });
 
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
+    container.addEventListener("keydown", (event) => {
+      const trigger = event.target.closest("[data-preview-url]");
 
-    event.preventDefault();
-    openPreview(trigger.dataset.previewUrl, "预览图");
-  });
+      if (!trigger) {
+        return;
+      }
+
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+
+      event.preventDefault();
+      openPreview(trigger.dataset.previewUrl, "预览图");
+    });
+  };
+
+  bindPreviewTrigger(refs.imageGroups);
+  bindPreviewTrigger(refs.countryImageSlot);
 
   refs.previewCloseBtn?.addEventListener("click", closePreview);
   refs.previewPrevBtn?.addEventListener("click", showPrevPreview);
@@ -490,6 +692,7 @@ async function submitQuery(event) {
 
   const code = refs.hiddenCode.value.trim().toUpperCase();
   const grade = refs.grade.value.trim().toUpperCase();
+  const country = refs.country.value.trim();
 
   if (!code || !grade) {
     setError("产品代码和报价等级都是必选项");
@@ -501,6 +704,13 @@ async function submitQuery(event) {
   refs.submitBtn.textContent = "获取中...";
   setLoadingText("正在请求接口并生成结果，请稍候...");
   resetResult();
+
+  if (country) {
+    loadCountryFilterImage(code, grade, country);
+  } else {
+    state.countryImageRequestId += 1;
+    renderCountryImageIdle("未选择国家，暂无筛选图");
+  }
 
   try {
     const response = await fetch(QUERY_URL, {
@@ -547,6 +757,15 @@ function bindEvents() {
     filterCodes(event.target.value);
   });
 
+  refs.country.addEventListener("change", () => {
+    if (refs.country.value.trim()) {
+      renderCountryImageIdle("国家已选择，点击确定后加载筛选图");
+      return;
+    }
+
+    renderCountryImageIdle("未选择国家，暂无筛选图");
+  });
+
   document.addEventListener("click", (event) => {
     if (!refs.panel.hidden && !refs.panel.contains(event.target) && !refs.trigger.contains(event.target)) {
       closePanel();
@@ -558,6 +777,9 @@ function bindEvents() {
 }
 
 function init() {
+  resetCountryOptions(true);
+  setCountryLoadingText("");
+  renderCountryImageIdle();
   bindEvents();
   loadOptions();
 }
